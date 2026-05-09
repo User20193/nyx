@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { Chat, Message } from "../types";
-import { defaultSampling } from "../types";
+import type { Chat, Message, AvatarStyle } from "../types";
+import { defaultSampling, AVATAR_STYLES } from "../types";
 import {
   listChats,
   createChat as dbCreateChat,
@@ -59,13 +59,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   async createChat(defaultModel) {
     const now = Date.now();
     const position = get().chats.length;
+    const id = newId();
+    const style: AvatarStyle =
+      AVATAR_STYLES[Math.floor(Math.random() * AVATAR_STYLES.length)];
     const chat: Chat = {
-      id: newId(),
+      id,
       name: "Новый чат",
       model: defaultModel,
       systemPromptOverride: null,
       position,
       sampling: { ...defaultSampling },
+      avatarSeed: id + "-" + Math.random().toString(36).slice(2, 8),
+      avatarStyle: style,
       createdAt: now,
       updatedAt: now,
     };

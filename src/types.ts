@@ -29,6 +29,17 @@ export const defaultSampling: SamplingSettings = {
   frequencyPenalty: 0,
 };
 
+export type AvatarStyle = "beam" | "marble" | "pixel" | "sunset" | "ring" | "bauhaus";
+
+export const AVATAR_STYLES: AvatarStyle[] = [
+  "beam",
+  "marble",
+  "pixel",
+  "sunset",
+  "ring",
+  "bauhaus",
+];
+
 export interface Chat {
   id: string;
   name: string;
@@ -36,6 +47,8 @@ export interface Chat {
   systemPromptOverride: string | null;
   position: number;
   sampling: SamplingSettings | null;
+  avatarSeed: string;
+  avatarStyle: AvatarStyle;
   createdAt: number;
   updatedAt: number;
 }

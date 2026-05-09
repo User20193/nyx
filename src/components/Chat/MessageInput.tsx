@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Square, ArrowDownToLine } from "lucide-react";
+import { Send, Square, ArrowDownToLine, Paperclip } from "lucide-react";
 import type { Chat } from "../../types";
 import { useChatStore } from "../../stores/chatStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -17,24 +17,18 @@ interface Props {
 
 export function MessageInput({ chat }: Props) {
   const [text, setText] = useState("");
+  const [dragOver, setDragOver] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
-  const streaming = useChatStore(
-    (s) => !!s.streamingByChat[chat.id]
-  );
+  const streaming = useChatStore((s) => !!s.streamingByChat[chat.id]);
   const apiKey = useSettingsStore((s) => s.activeApiKey);
   const messages = useChatStore((s) => s.messagesByChat[chat.id] ?? []);
   const models = useModelStore((s) => s.models);
-  const contextLimitOverride = useSettingsStore(
-    (s) => s.global.contextLimit
-  );
+  const contextLimitOverride = useSettingsStore((s) => s.global.contextLimit);
 
   const tokensInInput = useMemo(() => countTokens(text), [text]);
   const tokensInHistory = useMemo(
     () =>
-      messages.reduce(
-        (sum, m) => sum + countTokens(m.content) + 4,
-        0
-      ),
+      messages.reduce((sum, m) => sum + countTokens(m.content) + 4, 0),
     [messages]
   );
   const totalTokens = tokensInHistory + tokensInInput;
@@ -78,19 +72,46 @@ export function MessageInput({ chat }: Props) {
     }
   }
 
-  function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+  async function readTextLike(file: File) {
+    const isText =
+      file.type.startsWith("text/") ||
+      /\.(txt|md|json|csv|log|ts|tsx|js|jsx|py|rs|go|java|c|cpp|h|html|css|yaml|yml|toml|sh)$/i.test(
+        file.name
+      );
+    if (!isText) return null;
+    if (file.size > 200 * 1024) {
+      alert(`Файл "${file.name}" слишком большой (>200 КБ)`);
+      return null;
+    }
+    return await file.text();
+  }
+
+  async function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
     const items = e.clipboardData?.files;
     if (!items || items.length === 0) return;
-    const txtFile = Array.from(items).find(
-      (f) => f.type.startsWith("text/") || /\.(txt|md|json|csv|log)$/i.test(f.name)
-    );
-    if (txtFile) {
+    const file = items[0];
+    const content = await readTextLike(file);
+    if (content !== null) {
       e.preventDefault();
-      txtFile.text().then((content) => {
-        setText((cur) =>
-          (cur ? cur + "\n\n" : "") + `--- ${txtFile.name} ---\n${content}`
-        );
-      });
+      setText(
+        (cur) => (cur ? cur + "\n\n" : "") + `--- ${file.name} ---\n${content}`
+      );
+    }
+  }
+
+  async function onDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    let added = "";
+    for (const f of files) {
+      const content = await readTextLike(f);
+      if (content !== null) {
+        added += `\n\n--- ${f.name} ---\n${content}`;
+      }
+    }
+    if (added) {
+      setText((cur) => (cur ? cur + added : added.trimStart()));
     }
   }
 
@@ -100,9 +121,27 @@ export function MessageInput({ chat }: Props) {
   const canContinue = !streaming && !!lastBot && lastBot.content.trim().length > 0;
 
   return (
-    <div className="border-t border-app-border bg-app-bg">
+    <div className="border-t border-app-border-soft bg-app-bg/50 backdrop-blur-md">
       <div className="px-5 py-3 max-w-4xl mx-auto">
-        <div className="relative bg-app-surface border border-app-border rounded-2xl px-3 py-2 focus-within:border-app-accent transition-colors">
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+          className={`relative bg-app-surface/80 border rounded-2xl px-3 py-2 transition-all ${
+            dragOver
+              ? "border-app-accent ring-4 ring-app-accent/15"
+              : "border-app-border focus-within:border-app-accent focus-within:ring-2 focus-within:ring-app-accent/15"
+          }`}
+        >
+          {dragOver && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-app-accent text-xs font-medium bg-app-bg/60 rounded-2xl">
+              <Paperclip size={14} className="mr-1.5" />
+              Отпустите файл — он добавится в сообщение
+            </div>
+          )}
           <textarea
             ref={taRef}
             value={text}
@@ -110,7 +149,7 @@ export function MessageInput({ chat }: Props) {
             onKeyDown={onKeyDown}
             onPaste={onPaste}
             rows={1}
-            placeholder="Введите сообщение..."
+            placeholder="Введите сообщение... (Enter — отправить, Shift+Enter — новая строка)"
             className="w-full bg-transparent border-none outline-none resize-none py-1.5 pr-12 text-[14.5px] placeholder:text-app-text-muted"
           />
           <div className="absolute right-2 bottom-1.5 flex items-center gap-1">
@@ -137,7 +176,7 @@ export function MessageInput({ chat }: Props) {
               <button
                 onClick={send}
                 disabled={!text.trim()}
-                className="p-2 bg-app-accent text-white hover:bg-app-accent-hover rounded-full disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="p-2 bg-app-accent text-white hover:bg-app-accent-hover rounded-full disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-md shadow-app-accent/30"
                 title="Отправить (Enter)"
               >
                 <Send size={14} />

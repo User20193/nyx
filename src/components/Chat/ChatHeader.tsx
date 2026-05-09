@@ -1,8 +1,16 @@
 import { useState } from "react";
-import { Pencil, PanelRightClose, PanelRightOpen, Trash2, Check, X } from "lucide-react";
+import {
+  Pencil,
+  PanelRightClose,
+  PanelRightOpen,
+  Trash2,
+  Check,
+  X,
+} from "lucide-react";
 import type { Chat } from "../../types";
 import { useChatStore } from "../../stores/chatStore";
 import { modelDisplayName } from "../../lib/modelDisplay";
+import { ChatAvatar } from "../Sidebar/ChatAvatar";
 
 interface Props {
   chat: Chat;
@@ -27,8 +35,11 @@ export function ChatHeader({ chat, onToggleSettings, settingsOpen }: Props) {
   }
 
   return (
-    <div className="h-14 px-5 flex items-center justify-between border-b border-app-border bg-app-bg">
+    <div className="h-14 px-5 flex items-center justify-between border-b border-app-border-soft bg-app-bg/40 backdrop-blur-md">
       <div className="flex items-center gap-3 min-w-0">
+        <div className="rounded-full overflow-hidden ring-1 ring-white/5">
+          <ChatAvatar chat={chat} size={32} />
+        </div>
         {editing ? (
           <div className="flex items-center gap-2">
             <input
@@ -63,18 +74,20 @@ export function ChatHeader({ chat, onToggleSettings, settingsOpen }: Props) {
         ) : (
           <>
             <div className="min-w-0">
-              <div className="text-sm font-semibold truncate">{chat.name}</div>
+              <div className="text-sm font-semibold truncate flex items-center gap-1.5">
+                {chat.name}
+                <button
+                  onClick={() => setEditing(true)}
+                  className="p-1 text-app-text-muted hover:text-app-text hover:bg-app-surface rounded transition-colors opacity-0 group-hover:opacity-100"
+                  title="Переименовать чат"
+                >
+                  <Pencil size={11} />
+                </button>
+              </div>
               <div className="text-xs text-app-text-muted truncate">
                 {modelDisplayName(chat.model)}
               </div>
             </div>
-            <button
-              onClick={() => setEditing(true)}
-              className="p-1.5 text-app-text-muted hover:text-app-text hover:bg-app-surface rounded transition-colors"
-              title="Переименовать чат"
-            >
-              <Pencil size={13} />
-            </button>
           </>
         )}
       </div>
@@ -94,7 +107,7 @@ export function ChatHeader({ chat, onToggleSettings, settingsOpen }: Props) {
         <button
           onClick={onToggleSettings}
           className="p-2 text-app-text-muted hover:text-app-text hover:bg-app-surface rounded transition-colors"
-          title={settingsOpen ? "Скрыть настройки" : "Показать настройки"}
+          title={settingsOpen ? "Скрыть настройки (Ctrl+B)" : "Показать настройки (Ctrl+B)"}
         >
           {settingsOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
         </button>

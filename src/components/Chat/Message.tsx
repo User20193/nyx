@@ -84,11 +84,23 @@ export function Message({ chatId, message, chatModel }: Props) {
         )}
 
         <div
-          className={`relative rounded-2xl px-4 py-2.5 ${
+          className={`relative rounded-2xl px-4 py-2.5 shadow-md ${
             isUser
-              ? "bg-app-bubble-user text-white rounded-br-sm"
-              : "bg-app-bubble-bot text-app-text rounded-bl-sm"
+              ? "text-white rounded-br-sm"
+              : "bg-app-bubble-bot/80 backdrop-blur-sm text-app-text rounded-bl-sm border border-white/[0.04]"
           }`}
+          style={
+            isUser
+              ? {
+                  background:
+                    "linear-gradient(135deg, var(--color-app-accent), color-mix(in srgb, var(--color-app-accent) 80%, #9d4edd))",
+                  boxShadow:
+                    "0 2px 12px color-mix(in srgb, var(--color-app-accent) 35%, transparent)",
+                }
+              : {
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+                }
+          }
         >
           {message.pinned && (
             <Pin

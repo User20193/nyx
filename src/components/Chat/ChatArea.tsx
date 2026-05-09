@@ -32,7 +32,7 @@ export function ChatArea({ onToggleSettings, settingsOpen }: Props) {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-app-bg">
+    <div className="flex-1 flex flex-col min-w-0">
       <ChatHeader
         chat={chat}
         onToggleSettings={onToggleSettings}

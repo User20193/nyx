@@ -7,6 +7,7 @@ import { useChatStore } from "../stores/chatStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useModelStore } from "../stores/modelStore";
 import { motion, AnimatePresence } from "framer-motion";
+import { useHotkeys } from "../lib/useHotkeys";
 
 export function MainLayout() {
   const chats = useChatStore((s) => s.chats);
@@ -35,6 +36,7 @@ export function MainLayout() {
   }, [activeApiKey, loadModels]);
 
   useEffect(() => {
+    if (!accentColor || typeof accentColor !== "string") return;
     document.documentElement.style.setProperty("--color-app-accent", accentColor);
     document.documentElement.style.setProperty(
       "--color-app-bubble-user",
@@ -42,8 +44,32 @@ export function MainLayout() {
     );
   }, [accentColor]);
 
+  useHotkeys([
+    {
+      combo: "ctrl+,",
+      handler: () => setGlobalOpen((v) => !v),
+    },
+    {
+      combo: "ctrl+l",
+      handler: () => {
+        void createChat(defaultModel);
+      },
+    },
+    {
+      combo: "ctrl+b",
+      handler: () => setSettingsOpen((v) => !v),
+    },
+    {
+      combo: "escape",
+      handler: () => {
+        if (globalOpen) setGlobalOpen(false);
+      },
+      allowInInput: true,
+    },
+  ]);
+
   return (
-    <div className="flex h-full bg-app-bg text-app-text">
+    <div className="flex h-full app-bg-gradient text-app-text">
       <Sidebar onOpenGlobalSettings={() => setGlobalOpen(true)} />
       <div className="flex-1 flex min-w-0">
         <ChatArea
@@ -58,7 +84,7 @@ export function MainLayout() {
               animate={{ width: 320, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
-              className="border-l border-app-border bg-app-sidebar overflow-hidden"
+              className="border-l border-app-border-soft bg-app-sidebar/70 backdrop-blur-xl overflow-hidden"
             >
               <div className="w-[320px] h-full">
                 <SettingsPanel />

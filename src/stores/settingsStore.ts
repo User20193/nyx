@@ -20,6 +20,34 @@ import {
 } from "../lib/db";
 import { newId } from "../lib/ids";
 
+let pendingGlobalWrite: ReturnType<typeof setTimeout> | null = null;
+let pendingGlobalValue: GlobalSettings | null = null;
+
+function scheduleGlobalSave(value: GlobalSettings) {
+  pendingGlobalValue = value;
+  if (pendingGlobalWrite) clearTimeout(pendingGlobalWrite);
+  pendingGlobalWrite = setTimeout(() => {
+    if (pendingGlobalValue) {
+      const v = pendingGlobalValue;
+      pendingGlobalValue = null;
+      pendingGlobalWrite = null;
+      setSetting("global", v).catch((e) =>
+        console.error("[Nyx] failed to persist global settings", e)
+      );
+    }
+  }, 250);
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", () => {
+    if (pendingGlobalValue) {
+      void setSetting("global", pendingGlobalValue);
+      pendingGlobalValue = null;
+      if (pendingGlobalWrite) clearTimeout(pendingGlobalWrite);
+    }
+  });
+}
+
 interface SettingsState {
   loaded: boolean;
   global: GlobalSettings;
@@ -77,7 +105,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   async updateGlobal(patch) {
     const next = { ...get().global, ...patch };
     set({ global: next });
-    await setSetting("global", next);
+    scheduleGlobalSave(next);
   },
 
   async createPersona(name, bio) {

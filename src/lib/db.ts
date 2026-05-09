@@ -5,6 +5,7 @@ import type {
   Persona,
   ApiKey,
   SamplingSettings,
+  AvatarStyle,
 } from "../types";
 
 let dbInstance: Database | null = null;
@@ -23,6 +24,8 @@ interface ChatRow {
   system_prompt_override: string | null;
   position: number;
   sampling_json: string | null;
+  avatar_seed: string | null;
+  avatar_style: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -43,6 +46,8 @@ function rowToChat(r: ChatRow): Chat {
     systemPromptOverride: r.system_prompt_override,
     position: r.position,
     sampling,
+    avatarSeed: r.avatar_seed ?? r.id,
+    avatarStyle: ((r.avatar_style as AvatarStyle) || "beam"),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -59,8 +64,8 @@ export async function listChats(): Promise<Chat[]> {
 export async function createChat(chat: Chat): Promise<void> {
   const db = await getDb();
   await db.execute(
-    `INSERT INTO chats (id, name, model, system_prompt_override, position, sampling_json, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    `INSERT INTO chats (id, name, model, system_prompt_override, position, sampling_json, avatar_seed, avatar_style, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [
       chat.id,
       chat.name,
@@ -68,6 +73,8 @@ export async function createChat(chat: Chat): Promise<void> {
       chat.systemPromptOverride,
       chat.position,
       chat.sampling ? JSON.stringify(chat.sampling) : null,
+      chat.avatarSeed,
+      chat.avatarStyle,
       chat.createdAt,
       chat.updatedAt,
     ]
@@ -79,14 +86,16 @@ export async function updateChat(chat: Chat): Promise<void> {
   await db.execute(
     `UPDATE chats
      SET name = $1, model = $2, system_prompt_override = $3, position = $4,
-         sampling_json = $5, updated_at = $6
-     WHERE id = $7`,
+         sampling_json = $5, avatar_seed = $6, avatar_style = $7, updated_at = $8
+     WHERE id = $9`,
     [
       chat.name,
       chat.model,
       chat.systemPromptOverride,
       chat.position,
       chat.sampling ? JSON.stringify(chat.sampling) : null,
+      chat.avatarSeed,
+      chat.avatarStyle,
       chat.updatedAt,
       chat.id,
     ]
@@ -331,4 +340,13 @@ export async function setSetting(key: string, value: unknown): Promise<void> {
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     [key, stringValue]
   );
+}
+
+export async function resetAllData(): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM messages", []);
+  await db.execute("DELETE FROM chats", []);
+  await db.execute("DELETE FROM personas", []);
+  await db.execute("DELETE FROM settings", []);
+  await db.execute("DELETE FROM api_keys", []);
 }

@@ -4,6 +4,7 @@ import { MainLayout } from "./components/MainLayout";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useChatStore } from "./stores/chatStore";
 import { AnimatePresence, motion } from "framer-motion";
+import { resetAllData } from "./lib/db";
 
 export default function App() {
   const [bootError, setBootError] = useState<string | null>(null);
@@ -85,6 +86,57 @@ export default function App() {
           >
             {bootError}
           </pre>
+          <div
+            style={{
+              marginTop: 16,
+              display: "flex",
+              gap: 8,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => location.reload()}
+              style={{
+                padding: "8px 16px",
+                background: "#5b8def",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+                fontSize: 13,
+              }}
+            >
+              Перезагрузить
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (
+                  !confirm(
+                    "Удалить все данные (чаты, ключи, настройки)? Это нельзя отменить."
+                  )
+                )
+                  return;
+                try {
+                  await resetAllData();
+                  location.reload();
+                } catch (e) {
+                  alert("Не удалось сбросить: " + (e as Error).message);
+                }
+              }}
+              style={{
+                padding: "8px 16px",
+                background: "transparent",
+                color: "#ef4444",
+                border: "1px solid #ef4444",
+                borderRadius: 8,
+                cursor: "pointer",
+                fontSize: 13,
+              }}
+            >
+              Сбросить все данные
+            </button>
+          </div>
         </div>
       </div>
     );
