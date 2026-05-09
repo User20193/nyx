@@ -4,6 +4,43 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nyx</title>
+    <style>
+      html,
+      body,
+      #root {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #0e1014;
+        color: #e8eaed;
+        font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+      }
+      #boot-fallback {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 16px;
+        color: #9aa0a6;
+        font-size: 14px;
+        z-index: -1;
+      }
+      .boot-spinner {
+        width: 28px;
+        height: 28px;
+        border: 2px solid #22262e;
+        border-top-color: #5b8def;
+        border-radius: 50%;
+        animation: boot-spin 0.8s linear infinite;
+      }
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
     <link
       rel="preconnect"
       href="https://fonts.googleapis.com"
@@ -15,7 +52,65 @@
     />
   </head>
   <body>
+    <div id="boot-fallback">
+      <div class="boot-spinner"></div>
+      <div>Загрузка Nyx...</div>
+    </div>
     <div id="root"></div>
+    <script>
+      // Capture early errors before React mounts
+      window.__nyxBootErrors = [];
+      window.addEventListener("error", function (e) {
+        window.__nyxBootErrors.push({
+          type: "error",
+          message: e.message,
+          source: e.filename,
+          line: e.lineno,
+          col: e.colno,
+          stack: e.error && e.error.stack,
+        });
+        showBootError();
+      });
+      window.addEventListener("unhandledrejection", function (e) {
+        window.__nyxBootErrors.push({
+          type: "unhandledrejection",
+          message: String(e.reason && (e.reason.stack || e.reason.message || e.reason)),
+        });
+        showBootError();
+      });
+      function showBootError() {
+        var fallback = document.getElementById("boot-fallback");
+        if (!fallback) return;
+        var errs = window.__nyxBootErrors;
+        fallback.style.zIndex = "999";
+        fallback.innerHTML =
+          '<div style="max-width:600px;padding:24px;font-family:monospace;font-size:12px;color:#ef4444;text-align:left;white-space:pre-wrap;overflow:auto;max-height:80vh;">' +
+          '<div style="font-size:18px;font-weight:600;margin-bottom:12px;color:#e8eaed;">Ошибка запуска Nyx</div>' +
+          errs
+            .map(function (er) {
+              return (
+                "[" +
+                er.type +
+                "] " +
+                (er.message || "") +
+                (er.source ? "\nsource: " + er.source + ":" + er.line + ":" + er.col : "") +
+                (er.stack ? "\n" + er.stack : "")
+              );
+            })
+            .join("\n\n") +
+          '</div>';
+      }
+      // Hide fallback once React mounts (root has children)
+      var observer = new MutationObserver(function () {
+        var root = document.getElementById("root");
+        if (root && root.children.length > 0) {
+          var fb = document.getElementById("boot-fallback");
+          if (fb) fb.style.display = "none";
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

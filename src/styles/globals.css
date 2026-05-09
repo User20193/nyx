@@ -216,6 +216,12 @@ textarea,
   color: #f07178;
 }
 
+@keyframes boot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Pulse animation for typing indicator */
 @keyframes pulse-dot {
   0%,

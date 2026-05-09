@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 
 export default function App() {
   const [bootError, setBootError] = useState<string | null>(null);
+  const [bootStage, setBootStage] = useState<string>("инициализация");
   const [bootDone, setBootDone] = useState(false);
 
   const settingsLoaded = useSettingsStore((s) => s.loaded);
@@ -20,11 +21,16 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
+        setBootStage("загрузка настроек");
         await loadSettings();
+        if (cancelled) return;
+        setBootStage("загрузка чатов");
         await loadChats();
       } catch (e) {
         if (!cancelled) {
-          setBootError(e instanceof Error ? e.message : String(e));
+          const msg = e instanceof Error ? `${e.message}\n\n${e.stack ?? ""}` : String(e);
+          console.error("[Nyx] Boot error:", e);
+          setBootError(msg);
         }
       } finally {
         if (!cancelled) setBootDone(true);
@@ -37,14 +43,48 @@ export default function App() {
 
   if (bootError) {
     return (
-      <div className="flex h-screen items-center justify-center text-center px-8">
-        <div className="max-w-md">
-          <div className="text-2xl font-semibold mb-2 text-app-danger">
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          background: "#0e1014",
+          color: "#e8eaed",
+        }}
+      >
+        <div style={{ maxWidth: 600, width: "100%" }}>
+          <div
+            style={{
+              fontSize: 20,
+              fontWeight: 600,
+              color: "#ef4444",
+              marginBottom: 12,
+            }}
+          >
             Ошибка инициализации
           </div>
-          <div className="text-app-text-dim text-sm whitespace-pre-wrap font-mono">
-            {bootError}
+          <div style={{ fontSize: 13, color: "#9aa0a6", marginBottom: 12 }}>
+            На этапе: {bootStage}
           </div>
+          <pre
+            style={{
+              fontFamily: '"JetBrains Mono", Consolas, monospace',
+              fontSize: 12,
+              color: "#ef4444",
+              background: "#0a0c0f",
+              padding: 12,
+              borderRadius: 8,
+              overflow: "auto",
+              maxHeight: 400,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {bootError}
+          </pre>
         </div>
       </div>
     );
@@ -52,8 +92,30 @@ export default function App() {
 
   if (!bootDone || !settingsLoaded || !chatsLoaded) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-app-text-dim text-sm">Загрузка...</div>
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
+          background: "#0e1014",
+          color: "#9aa0a6",
+        }}
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            border: "2px solid #22262e",
+            borderTopColor: "#5b8def",
+            borderRadius: "50%",
+            animation: "boot-spin 0.8s linear infinite",
+          }}
+        />
+        <div style={{ fontSize: 14 }}>Загрузка: {bootStage}</div>
       </div>
     );
   }
