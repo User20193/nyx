@@ -1,0 +1,243 @@
+@import "tailwindcss";
+
+@theme {
+  --color-app-bg: #0e1014;
+  --color-app-sidebar: #0a0c0f;
+  --color-app-surface: #1a1d24;
+  --color-app-surface-2: #22262e;
+  --color-app-text: #e8eaed;
+  --color-app-text-dim: #9aa0a6;
+  --color-app-text-muted: #6b7280;
+  --color-app-border: #22262e;
+  --color-app-border-soft: #1a1d24;
+  --color-app-accent: #5b8def;
+  --color-app-accent-hover: #6f9af2;
+  --color-app-accent-soft: rgba(91, 141, 239, 0.15);
+  --color-app-danger: #ef4444;
+  --color-app-success: #10b981;
+  --color-app-bubble-user: #2b6cf0;
+  --color-app-bubble-bot: #1a1d24;
+
+  --font-sans: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont,
+    "Roboto", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--color-app-bg);
+  color: var(--color-app-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  overflow: hidden;
+}
+
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+}
+
+.message-content,
+.message-content * {
+  user-select: text;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-app-surface-2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-app-text-muted);
+}
+
+/* Markdown content styles for bot messages */
+.message-content {
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+.message-content p {
+  margin: 0;
+}
+
+.message-content p + p {
+  margin-top: 0.6em;
+}
+
+.message-content h1,
+.message-content h2,
+.message-content h3,
+.message-content h4 {
+  font-weight: 600;
+  margin: 0.8em 0 0.4em;
+}
+
+.message-content h1 {
+  font-size: 1.4em;
+}
+
+.message-content h2 {
+  font-size: 1.2em;
+}
+
+.message-content h3 {
+  font-size: 1.1em;
+}
+
+.message-content ul,
+.message-content ol {
+  padding-left: 1.4em;
+  margin: 0.4em 0;
+}
+
+.message-content li + li {
+  margin-top: 0.2em;
+}
+
+.message-content code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.message-content pre {
+  background: #0a0c0f;
+  border: 1px solid var(--color-app-border);
+  padding: 0.75em 1em;
+  border-radius: 8px;
+  margin: 0.6em 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  line-height: 1.5;
+}
+
+.message-content pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+.message-content blockquote {
+  border-left: 3px solid var(--color-app-accent);
+  padding-left: 0.8em;
+  margin: 0.4em 0;
+  color: var(--color-app-text-dim);
+}
+
+.message-content a {
+  color: var(--color-app-accent);
+  text-decoration: none;
+}
+
+.message-content a:hover {
+  text-decoration: underline;
+}
+
+.message-content em {
+  color: var(--color-app-text-dim);
+}
+
+.message-content table {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+}
+
+.message-content th,
+.message-content td {
+  border: 1px solid var(--color-app-border);
+  padding: 0.4em 0.7em;
+}
+
+.message-content hr {
+  border: none;
+  border-top: 1px solid var(--color-app-border);
+  margin: 0.8em 0;
+}
+
+/* Highlight.js theme overrides for dark */
+.hljs {
+  color: #e8eaed;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in {
+  color: #c792ea;
+}
+
+.hljs-string,
+.hljs-attr {
+  color: #c3e88d;
+}
+
+.hljs-number,
+.hljs-literal {
+  color: #f78c6c;
+}
+
+.hljs-comment {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.hljs-function,
+.hljs-title {
+  color: #82aaff;
+}
+
+.hljs-variable,
+.hljs-params {
+  color: #ffcb6b;
+}
+
+.hljs-tag,
+.hljs-name {
+  color: #f07178;
+}
+
+/* Pulse animation for typing indicator */
+@keyframes pulse-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  animation: pulse-dot 1.2s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
