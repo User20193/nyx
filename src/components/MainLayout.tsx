@@ -3,6 +3,7 @@ import { Sidebar } from "./Sidebar/Sidebar";
 import { ChatArea } from "./Chat/ChatArea";
 import { SettingsPanel } from "./Settings/SettingsPanel";
 import { GlobalSettingsModal } from "./Settings/GlobalSettingsModal";
+import { ScenarioPicker } from "./Game/ScenarioPicker";
 import { useChatStore } from "../stores/chatStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useModelStore } from "../stores/modelStore";
@@ -20,6 +21,7 @@ export function MainLayout() {
   const loadModels = useModelStore((s) => s.load);
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [globalOpen, setGlobalOpen] = useState(false);
+  const [scenarioPickerOpen, setScenarioPickerOpen] = useState(false);
 
   useEffect(() => {
     if (chats.length === 0) {
@@ -27,7 +29,11 @@ export function MainLayout() {
     } else if (!activeChatId) {
       void selectChat(chats[0].id);
     }
-  }, [chats, activeChatId, createChat, selectChat, defaultModel]);
+    // Only re-run when ID lists actually change. createChat/selectChat are
+    // stable zustand methods — including them in deps is fine but doesn't
+    // trigger re-runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chats.length, activeChatId, defaultModel]);
 
   useEffect(() => {
     if (activeApiKey) {
@@ -36,7 +42,9 @@ export function MainLayout() {
   }, [activeApiKey, loadModels]);
 
   useEffect(() => {
+    // Defensive — accentColor must be a valid CSS color string.
     if (!accentColor || typeof accentColor !== "string") return;
+    if (!/^#[0-9a-fA-F]{3,8}$|^rgb|^hsl/.test(accentColor)) return;
     document.documentElement.style.setProperty("--color-app-accent", accentColor);
     document.documentElement.style.setProperty(
       "--color-app-bubble-user",
@@ -56,13 +64,18 @@ export function MainLayout() {
       },
     },
     {
+      combo: "ctrl+g",
+      handler: () => setScenarioPickerOpen(true),
+    },
+    {
       combo: "ctrl+b",
       handler: () => setSettingsOpen((v) => !v),
     },
     {
       combo: "escape",
       handler: () => {
-        if (globalOpen) setGlobalOpen(false);
+        if (scenarioPickerOpen) setScenarioPickerOpen(false);
+        else if (globalOpen) setGlobalOpen(false);
       },
       allowInInput: true,
     },
@@ -70,7 +83,10 @@ export function MainLayout() {
 
   return (
     <div className="flex h-full app-bg-gradient text-app-text">
-      <Sidebar onOpenGlobalSettings={() => setGlobalOpen(true)} />
+      <Sidebar
+        onOpenGlobalSettings={() => setGlobalOpen(true)}
+        onOpenScenarioPicker={() => setScenarioPickerOpen(true)}
+      />
       <div className="flex-1 flex min-w-0">
         <ChatArea
           onToggleSettings={() => setSettingsOpen((v) => !v)}
@@ -95,6 +111,11 @@ export function MainLayout() {
       </div>
       <AnimatePresence>
         {globalOpen && <GlobalSettingsModal onClose={() => setGlobalOpen(false)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {scenarioPickerOpen && (
+          <ScenarioPicker onClose={() => setScenarioPickerOpen(false)} />
+        )}
       </AnimatePresence>
     </div>
   );

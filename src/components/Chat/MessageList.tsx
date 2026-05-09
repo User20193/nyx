@@ -9,9 +9,10 @@ interface Props {
   messages: MessageType[];
   streaming: boolean;
   chatModel: string | null;
+  isGm?: boolean;
 }
 
-export function MessageList({ chatId, messages, streaming, chatModel }: Props) {
+export function MessageList({ chatId, messages, streaming, chatModel, isGm }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const prevLenRef = useRef(0);
   const visible = messages.filter((m) => m.role !== "system");
@@ -82,6 +83,7 @@ export function MessageList({ chatId, messages, streaming, chatModel }: Props) {
               chatId={chatId}
               message={m}
               chatModel={chatModel}
+              meta={{ isGm: !!isGm }}
             />
           ))}
           {showTyping && (

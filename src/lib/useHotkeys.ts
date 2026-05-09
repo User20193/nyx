@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export type Hotkey = {
   combo: string;
@@ -25,18 +25,25 @@ function matches(combo: string, e: KeyboardEvent): boolean {
 function isInputTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
-  return (
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    target.isContentEditable
-  );
+  return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
 }
 
+/**
+ * Register keyboard hotkeys.
+ *
+ * The `hotkeys` array can be re-created on every render — we keep the
+ * latest list in a ref and only register/unregister the listener ONCE
+ * on mount. This prevents the keydown listener from being torn down
+ * and re-attached on every render, which can cascade into render loops.
+ */
 export function useHotkeys(hotkeys: Hotkey[]) {
+  const ref = useRef<Hotkey[]>(hotkeys);
+  ref.current = hotkeys;
+
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       const inInput = isInputTarget(e.target);
-      for (const h of hotkeys) {
+      for (const h of ref.current) {
         if (matches(h.combo, e)) {
           if (inInput && !h.allowInInput) continue;
           e.preventDefault();
@@ -47,5 +54,5 @@ export function useHotkeys(hotkeys: Hotkey[]) {
     }
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [hotkeys]);
+  }, []);
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Copy, Pencil, RotateCw, Trash2, Pin, GitBranch, Check, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -10,11 +10,17 @@ import { modelDisplayName } from "../../lib/modelDisplay";
 import { regenerateAssistantMessage } from "../../lib/chatActions";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useModelStore } from "../../stores/modelStore";
+import { stripStateBlocks } from "../../lib/gameState";
+
+interface MessageMeta {
+  isGm: boolean;
+}
 
 interface Props {
   chatId: string;
   message: MessageType;
   chatModel: string | null;
+  meta?: MessageMeta;
 }
 
 function formatTime(ts: number): string {
@@ -24,17 +30,26 @@ function formatTime(ts: number): string {
   return `${hh}:${mm}`;
 }
 
-export function Message({ chatId, message, chatModel }: Props) {
+export function Message({ chatId, message, chatModel, meta }: Props) {
   const isUser = message.role === "user";
   const updateMessage = useChatStore((s) => s.updateMessage);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
   const pinMessage = useChatStore((s) => s.pinMessage);
   const truncateChatFromMessage = useChatStore((s) => s.truncateChatFromMessage);
-  const settings = useSettingsStore();
+  const activeApiKey = useSettingsStore((s) => s.activeApiKey);
   const models = useModelStore((s) => s.models);
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
+
+  // In GM mode, hide the trailing nyx-state JSON blocks from the user
+  // — the parsed state is shown in the side panel instead.
+  const displayContent = useMemo(() => {
+    if (meta?.isGm && !isUser) {
+      return stripStateBlocks(message.content);
+    }
+    return message.content;
+  }, [message.content, meta?.isGm, isUser]);
 
   async function saveEdit() {
     if (draft.trim() === message.content.trim() || !draft.trim()) {
@@ -47,7 +62,7 @@ export function Message({ chatId, message, chatModel }: Props) {
   }
 
   async function regenerate() {
-    if (!settings.activeApiKey) return;
+    if (!activeApiKey) return;
     await regenerateAssistantMessage({
       chatId,
       messageId: message.id,
@@ -69,7 +84,6 @@ export function Message({ chatId, message, chatModel }: Props) {
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
@@ -114,7 +128,7 @@ export function Message({ chatId, message, chatModel }: Props) {
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                rows={Math.min(8, draft.split("\n").length + 1)}
+                rows={Math.min(8, Math.max(2, draft.split("\n").length + 1))}
                 className="bg-transparent text-inherit border-none outline-none resize-none w-full"
                 autoFocus
               />
@@ -140,7 +154,7 @@ export function Message({ chatId, message, chatModel }: Props) {
             <>
               {isUser ? (
                 <div className="message-content whitespace-pre-wrap text-[14.5px]">
-                  {message.content}
+                  {displayContent}
                 </div>
               ) : (
                 <div className="message-content text-[14.5px]">
@@ -148,7 +162,7 @@ export function Message({ chatId, message, chatModel }: Props) {
                     remarkPlugins={[remarkGfm]}
                     rehypePlugins={[rehypeHighlight]}
                   >
-                    {message.content}
+                    {displayContent}
                   </ReactMarkdown>
                 </div>
               )}

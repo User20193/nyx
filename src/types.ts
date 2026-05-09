@@ -40,6 +40,17 @@ export const AVATAR_STYLES: AvatarStyle[] = [
   "bauhaus",
 ];
 
+export type GameMode = "normal" | "gm";
+
+export type GameStateValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | { [k: string]: GameStateValue };
+
+export type GameState = Record<string, GameStateValue>;
+
 export interface Chat {
   id: string;
   name: string;
@@ -49,6 +60,13 @@ export interface Chat {
   sampling: SamplingSettings | null;
   avatarSeed: string;
   avatarStyle: AvatarStyle;
+  gameMode: GameMode;
+  gameState: GameState | null;
+  initialState: GameState | null;
+  authorNote: string | null;
+  scenarioId: string | null;
+  scenarioPrompt: string | null;
+  playerRole: string | null;
   createdAt: number;
   updatedAt: number;
 }

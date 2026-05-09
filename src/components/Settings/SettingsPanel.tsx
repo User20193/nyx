@@ -4,19 +4,25 @@ import { ModelPicker } from "./ModelPicker";
 import { SamplingControls } from "./SamplingControls";
 import { SystemPromptEditor } from "./SystemPromptEditor";
 import { UncensoredToggle } from "./UncensoredToggle";
+import { GameSettings } from "./GameSettings";
 
 export function SettingsPanel() {
-  const chat = useChatStore((s) => s.chats.find((c) => c.id === s.activeChatId));
+  const chat = useChatStore((s) =>
+    s.activeChatId ? s.chats.find((c) => c.id === s.activeChatId) : undefined
+  );
   const updateChat = useChatStore((s) => s.updateChat);
-  const settings = useSettingsStore();
+  const uncensoredEnabled = useSettingsStore((s) => s.global.uncensoredEnabled);
+  const updateGlobal = useSettingsStore((s) => s.updateGlobal);
 
   if (!chat) return null;
+
+  const isGm = chat.gameMode === "gm";
 
   return (
     <div className="h-full flex flex-col">
       <div className="h-14 px-4 flex items-center border-b border-app-border">
         <div className="text-xs uppercase tracking-wider text-app-text-dim font-semibold">
-          Настройки чата
+          {isGm ? "Настройки сценария" : "Настройки чата"}
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
@@ -27,17 +33,21 @@ export function SettingsPanel() {
           }}
         />
 
-        <SystemPromptEditor
-          value={chat.systemPromptOverride ?? ""}
-          onChange={async (v) => {
-            await updateChat({
-              ...chat,
-              systemPromptOverride: v || null,
-              updatedAt: Date.now(),
-            });
-          }}
-          placeholder="Системный промпт для этого чата (опционально)"
-        />
+        {isGm && <GameSettings chat={chat} />}
+
+        {!isGm && (
+          <SystemPromptEditor
+            value={chat.systemPromptOverride ?? ""}
+            onChange={async (v) => {
+              await updateChat({
+                ...chat,
+                systemPromptOverride: v || null,
+                updatedAt: Date.now(),
+              });
+            }}
+            placeholder="Системный промпт для этого чата (опционально)"
+          />
+        )}
 
         <SamplingControls
           sampling={chat.sampling}
@@ -47,9 +57,9 @@ export function SettingsPanel() {
         />
 
         <UncensoredToggle
-          value={settings.global.uncensoredEnabled}
+          value={uncensoredEnabled}
           onChange={async (v) => {
-            await settings.updateGlobal({ uncensoredEnabled: v });
+            await updateGlobal({ uncensoredEnabled: v });
           }}
         />
       </div>

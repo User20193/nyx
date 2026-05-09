@@ -5,9 +5,14 @@ import {
   nonStreamChatCompletion,
   type ChatMessage,
 } from "./openrouter";
-import { buildSystemPrompt } from "./prompts";
+import {
+  buildSystemPrompt,
+  buildGmSystemPrompt,
+  buildCurrentStateInjection,
+} from "./prompts";
+import { parseAndStripState, stripStateBlocks } from "./gameState";
 import { newId } from "./ids";
-import type { Message, ModelInfo, SamplingSettings } from "../types";
+import type { Chat, Message, ModelInfo, SamplingSettings } from "../types";
 import { defaultSampling } from "../types";
 import { trimToFit, countTokens } from "./tokens";
 
@@ -93,18 +98,29 @@ export async function runAssistantTurn(args: {
   const modelId = pickModel(chat.model, settings.global.defaultModel, models);
   const sampling = effectiveSampling(chat.sampling);
 
-  const systemPrompt = buildSystemPrompt({
-    globalSettings: settings.global,
-    activePersona: settings.activePersona,
-    chatOverride: chat.systemPromptOverride,
-  });
+  const isGm = chat.gameMode === "gm";
+
+  const systemPrompt = isGm
+    ? buildGmSystemPrompt({
+        chat,
+        globalSettings: settings.global,
+        activePersona: settings.activePersona,
+      })
+    : buildSystemPrompt({
+        globalSettings: settings.global,
+        activePersona: settings.activePersona,
+        chatOverride: chat.systemPromptOverride,
+      });
+
+  const stateInjection = isGm ? buildCurrentStateInjection(chat.gameState) : "";
 
   const ctxTokens = getContextLimitTokens(
     modelId,
     models,
     settings.global.contextLimit
   );
-  const sysTokens = countTokens(systemPrompt);
+  const sysTokens =
+    countTokens(systemPrompt) + countTokens(stateInjection);
   const trimmed = trimToFit(
     visibleHistory,
     sysTokens,
@@ -117,10 +133,21 @@ export async function runAssistantTurn(args: {
     apiMessages.push({ role: "system", content: systemPrompt });
   }
   for (const m of trimmed) {
+    // In GM mode, strip nyx-state blocks from older messages so the model
+    // doesn't burn tokens re-reading every old state — current state is
+    // injected fresh below.
+    const content =
+      isGm && m.role === "assistant"
+        ? stripStateBlocks(m.content)
+        : m.content;
     apiMessages.push({
       role: m.role === "system" ? "system" : m.role,
-      content: m.content,
+      content,
     });
+  }
+  if (isGm && stateInjection) {
+    // Fresh state right before generation — most influential position.
+    apiMessages.push({ role: "system", content: stateInjection });
   }
 
   const assistantMsg: Message = {
@@ -163,6 +190,9 @@ export async function runAssistantTurn(args: {
       useChatStore.getState().appendToMessage(chatId, assistantMsg.id, full);
     }
     await useChatStore.getState().finalizeMessage(chatId, assistantMsg.id);
+    if (isGm) {
+      await applyStateFromAssistantMessage(chatId, assistantMsg.id);
+    }
   } catch (e) {
     const wasAborted = ctrl.signal.aborted;
     if (wasAborted) {
@@ -213,6 +243,9 @@ export async function runAssistantTurn(args: {
                   ?.content ?? ""
               )
             );
+          if (isGm) {
+            await applyStateFromAssistantMessage(chatId, assistantMsg.id);
+          }
         } catch (e2) {
           const err2 = e2 instanceof Error ? e2.message : String(e2);
           await useChatStore
@@ -233,6 +266,45 @@ export async function runAssistantTurn(args: {
     useChatStore.getState().setStreaming(chatId, false);
     useChatStore.getState().setAbort(chatId, null);
   }
+}
+
+/**
+ * In GM mode, parse the trailing nyx-state block from the assistant's last
+ * message and update the chat's gameState. Idempotent — safe to call twice.
+ */
+async function applyStateFromAssistantMessage(
+  chatId: string,
+  messageId: string
+): Promise<void> {
+  const chatStore = useChatStore.getState();
+  const msgs = chatStore.messagesByChat[chatId] ?? [];
+  const msg = msgs.find((m) => m.id === messageId);
+  if (!msg) return;
+  const parsed = parseAndStripState(msg.content);
+  if (parsed.state) {
+    await chatStore.applyGameState(chatId, parsed.state);
+  }
+}
+
+/**
+ * Seed a brand-new GM chat with the scenario's opening scene as the first
+ * assistant message. State is already on the chat itself.
+ */
+export async function seedGmChatOpening(args: {
+  chat: Chat;
+  openingScene: string;
+}): Promise<void> {
+  const { chat, openingScene } = args;
+  const msg: Message = {
+    id: newId(),
+    chatId: chat.id,
+    role: "assistant",
+    content: openingScene,
+    modelUsed: null,
+    pinned: false,
+    createdAt: Date.now(),
+  };
+  await useChatStore.getState().addMessage(msg);
 }
 
 export function stopGeneration(chatId: string): void {

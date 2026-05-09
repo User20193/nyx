@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import type { Chat, Message, AvatarStyle } from "../types";
+import type { Chat, Message, AvatarStyle, GameState } from "../types";
 import { defaultSampling, AVATAR_STYLES } from "../types";
+import { getScenario } from "../lib/scenarios";
 import {
   listChats,
   createChat as dbCreateChat,
@@ -26,10 +27,23 @@ interface ChatState {
   load: () => Promise<void>;
 
   createChat: (defaultModel: string) => Promise<Chat>;
+  createGmChat: (
+    defaultModel: string,
+    scenarioId: string,
+    opening: {
+      name: string;
+      playerRole: string;
+      authorNote: string;
+      initialState: GameState;
+      scenarioPrompt: string | null;
+    }
+  ) => Promise<Chat>;
   selectChat: (id: string) => Promise<void>;
   updateChat: (chat: Chat) => Promise<void>;
   deleteChat: (id: string) => Promise<void>;
   reorderChats: (orderedIds: string[]) => Promise<void>;
+  applyGameState: (chatId: string, state: GameState) => Promise<void>;
+  resetGameState: (chatId: string) => Promise<void>;
 
   addMessage: (msg: Message) => Promise<void>;
   appendToMessage: (chatId: string, messageId: string, delta: string) => void;
@@ -57,23 +71,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   async createChat(defaultModel) {
-    const now = Date.now();
-    const position = get().chats.length;
-    const id = newId();
-    const style: AvatarStyle =
-      AVATAR_STYLES[Math.floor(Math.random() * AVATAR_STYLES.length)];
-    const chat: Chat = {
-      id,
-      name: "Новый чат",
-      model: defaultModel,
-      systemPromptOverride: null,
-      position,
-      sampling: { ...defaultSampling },
-      avatarSeed: id + "-" + Math.random().toString(36).slice(2, 8),
-      avatarStyle: style,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const chat = makeNormalChat({
+      defaultModel,
+      position: get().chats.length,
+    });
+    await dbCreateChat(chat);
+    set({
+      chats: [...get().chats, chat],
+      activeChatId: chat.id,
+      messagesByChat: { ...get().messagesByChat, [chat.id]: [] },
+    });
+    return chat;
+  },
+
+  async createGmChat(defaultModel, scenarioId, opening) {
+    const chat = makeGmChat({
+      defaultModel,
+      position: get().chats.length,
+      scenarioId,
+      ...opening,
+    });
     await dbCreateChat(chat);
     set({
       chats: [...get().chats, chat],
@@ -126,6 +143,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
     for (const c of reordered) {
       await dbUpdateChat(c);
     }
+  },
+
+  async applyGameState(chatId, state) {
+    const cur = get().chats.find((c) => c.id === chatId);
+    if (!cur) return;
+    const updated: Chat = {
+      ...cur,
+      gameState: state,
+      updatedAt: Date.now(),
+    };
+    await dbUpdateChat(updated);
+    set({
+      chats: get().chats.map((c) => (c.id === chatId ? updated : c)),
+    });
+  },
+
+  async resetGameState(chatId) {
+    const cur = get().chats.find((c) => c.id === chatId);
+    if (!cur || !cur.initialState) return;
+    const updated: Chat = {
+      ...cur,
+      gameState: JSON.parse(JSON.stringify(cur.initialState)) as GameState,
+      updatedAt: Date.now(),
+    };
+    await dbUpdateChat(updated);
+    set({
+      chats: get().chats.map((c) => (c.id === chatId ? updated : c)),
+    });
   },
 
   async addMessage(msg) {
@@ -211,3 +256,69 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 }));
+
+function makeNormalChat(args: {
+  defaultModel: string;
+  position: number;
+}): Chat {
+  const now = Date.now();
+  const id = newId();
+  const style: AvatarStyle =
+    AVATAR_STYLES[Math.floor(Math.random() * AVATAR_STYLES.length)];
+  return {
+    id,
+    name: "Новый чат",
+    model: args.defaultModel,
+    systemPromptOverride: null,
+    position: args.position,
+    sampling: { ...defaultSampling },
+    avatarSeed: id + "-" + Math.random().toString(36).slice(2, 8),
+    avatarStyle: style,
+    gameMode: "normal",
+    gameState: null,
+    initialState: null,
+    authorNote: null,
+    scenarioId: null,
+    scenarioPrompt: null,
+    playerRole: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function makeGmChat(args: {
+  defaultModel: string;
+  position: number;
+  scenarioId: string;
+  name: string;
+  playerRole: string;
+  authorNote: string;
+  initialState: GameState;
+  scenarioPrompt: string | null;
+}): Chat {
+  const now = Date.now();
+  const id = newId();
+  const scenario = getScenario(args.scenarioId);
+  // GM chats have a fixed avatar style for visual consistency,
+  // but a random seed so different sessions look different.
+  const style: AvatarStyle = "marble";
+  return {
+    id,
+    name: args.name || scenario?.chatName || "GM-сценарий",
+    model: args.defaultModel,
+    systemPromptOverride: null,
+    position: args.position,
+    sampling: { ...defaultSampling, temperature: 0.85, maxTokens: 2400 },
+    avatarSeed: id + "-" + Math.random().toString(36).slice(2, 8),
+    avatarStyle: style,
+    gameMode: "gm",
+    gameState: JSON.parse(JSON.stringify(args.initialState)) as GameState,
+    initialState: JSON.parse(JSON.stringify(args.initialState)) as GameState,
+    authorNote: args.authorNote,
+    scenarioId: args.scenarioId,
+    scenarioPrompt: args.scenarioPrompt,
+    playerRole: args.playerRole,
+    createdAt: now,
+    updatedAt: now,
+  };
+}

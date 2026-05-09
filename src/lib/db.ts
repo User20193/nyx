@@ -6,6 +6,8 @@ import type {
   ApiKey,
   SamplingSettings,
   AvatarStyle,
+  GameMode,
+  GameState,
 } from "../types";
 
 let dbInstance: Database | null = null;
@@ -26,28 +28,43 @@ interface ChatRow {
   sampling_json: string | null;
   avatar_seed: string | null;
   avatar_style: string | null;
+  game_mode: string | null;
+  game_state: string | null;
+  initial_state: string | null;
+  author_note: string | null;
+  scenario_id: string | null;
+  scenario_prompt: string | null;
+  player_role: string | null;
   created_at: number;
   updated_at: number;
 }
 
-function rowToChat(r: ChatRow): Chat {
-  let sampling: SamplingSettings | null = null;
-  if (r.sampling_json) {
-    try {
-      sampling = JSON.parse(r.sampling_json) as SamplingSettings;
-    } catch {
-      sampling = null;
-    }
+function safeJson<T>(s: string | null | undefined): T | null {
+  if (!s) return null;
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    return null;
   }
+}
+
+function rowToChat(r: ChatRow): Chat {
   return {
     id: r.id,
     name: r.name,
     model: r.model,
     systemPromptOverride: r.system_prompt_override,
     position: r.position,
-    sampling,
+    sampling: safeJson<SamplingSettings>(r.sampling_json),
     avatarSeed: r.avatar_seed ?? r.id,
     avatarStyle: ((r.avatar_style as AvatarStyle) || "beam"),
+    gameMode: ((r.game_mode as GameMode) || "normal"),
+    gameState: safeJson<GameState>(r.game_state),
+    initialState: safeJson<GameState>(r.initial_state),
+    authorNote: r.author_note,
+    scenarioId: r.scenario_id,
+    scenarioPrompt: r.scenario_prompt,
+    playerRole: r.player_role,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -64,8 +81,14 @@ export async function listChats(): Promise<Chat[]> {
 export async function createChat(chat: Chat): Promise<void> {
   const db = await getDb();
   await db.execute(
-    `INSERT INTO chats (id, name, model, system_prompt_override, position, sampling_json, avatar_seed, avatar_style, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    `INSERT INTO chats (
+       id, name, model, system_prompt_override, position, sampling_json,
+       avatar_seed, avatar_style,
+       game_mode, game_state, initial_state, author_note,
+       scenario_id, scenario_prompt, player_role,
+       created_at, updated_at
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
     [
       chat.id,
       chat.name,
@@ -75,6 +98,13 @@ export async function createChat(chat: Chat): Promise<void> {
       chat.sampling ? JSON.stringify(chat.sampling) : null,
       chat.avatarSeed,
       chat.avatarStyle,
+      chat.gameMode,
+      chat.gameState ? JSON.stringify(chat.gameState) : null,
+      chat.initialState ? JSON.stringify(chat.initialState) : null,
+      chat.authorNote,
+      chat.scenarioId,
+      chat.scenarioPrompt,
+      chat.playerRole,
       chat.createdAt,
       chat.updatedAt,
     ]
@@ -86,8 +116,11 @@ export async function updateChat(chat: Chat): Promise<void> {
   await db.execute(
     `UPDATE chats
      SET name = $1, model = $2, system_prompt_override = $3, position = $4,
-         sampling_json = $5, avatar_seed = $6, avatar_style = $7, updated_at = $8
-     WHERE id = $9`,
+         sampling_json = $5, avatar_seed = $6, avatar_style = $7,
+         game_mode = $8, game_state = $9, initial_state = $10, author_note = $11,
+         scenario_id = $12, scenario_prompt = $13, player_role = $14,
+         updated_at = $15
+     WHERE id = $16`,
     [
       chat.name,
       chat.model,
@@ -96,6 +129,13 @@ export async function updateChat(chat: Chat): Promise<void> {
       chat.sampling ? JSON.stringify(chat.sampling) : null,
       chat.avatarSeed,
       chat.avatarStyle,
+      chat.gameMode,
+      chat.gameState ? JSON.stringify(chat.gameState) : null,
+      chat.initialState ? JSON.stringify(chat.initialState) : null,
+      chat.authorNote,
+      chat.scenarioId,
+      chat.scenarioPrompt,
+      chat.playerRole,
       chat.updatedAt,
       chat.id,
     ]

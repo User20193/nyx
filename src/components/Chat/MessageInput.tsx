@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Square, ArrowDownToLine, Paperclip } from "lucide-react";
+import { Send, Square, ArrowDownToLine, Paperclip, Dice5 } from "lucide-react";
 import type { Chat } from "../../types";
 import { useChatStore } from "../../stores/chatStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -10,6 +10,9 @@ import {
   continueAssistantMessage,
 } from "../../lib/chatActions";
 import { countTokens } from "../../lib/tokens";
+import { rollDice, formatRoll, parseSlashCommand } from "../../lib/dice";
+
+const EMPTY_MSGS: never[] = [];
 
 interface Props {
   chat: Chat;
@@ -21,7 +24,7 @@ export function MessageInput({ chat }: Props) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const streaming = useChatStore((s) => !!s.streamingByChat[chat.id]);
   const apiKey = useSettingsStore((s) => s.activeApiKey);
-  const messages = useChatStore((s) => s.messagesByChat[chat.id] ?? []);
+  const messages = useChatStore((s) => s.messagesByChat[chat.id] ?? EMPTY_MSGS);
   const models = useModelStore((s) => s.models);
   const contextLimitOverride = useSettingsStore((s) => s.global.contextLimit);
 
@@ -49,6 +52,33 @@ export function MessageInput({ chat }: Props) {
   async function send() {
     const trimmed = text.trim();
     if (!trimmed || streaming) return;
+
+    // Slash commands intercepted client-side before going to the model.
+    const slash = parseSlashCommand(trimmed);
+    if (slash && slash.cmd === "roll") {
+      const result = rollDice(slash.rest || "1d20");
+      if (!result) {
+        alert(
+          'Не понял формулу броска. Пример: "/roll 2d6", "/roll 1d20+3", "/roll d100".'
+        );
+        return;
+      }
+      setText("");
+      // Roll is a user message — model will see it and react in its next turn.
+      try {
+        await sendUserMessage({
+          chatId: chat.id,
+          userText: formatRoll(result),
+          models,
+        });
+      } catch (e) {
+        alert(
+          `Не удалось отправить бросок: ${e instanceof Error ? e.message : String(e)}`
+        );
+      }
+      return;
+    }
+
     if (!apiKey) {
       alert("Нет активного API-ключа. Добавь ключ в настройках.");
       return;
@@ -63,6 +93,11 @@ export function MessageInput({ chat }: Props) {
     } catch (e) {
       alert(`Не удалось отправить: ${e instanceof Error ? e.message : String(e)}`);
     }
+  }
+
+  function quickRoll(expr: string) {
+    setText((cur) => (cur ? cur + ` /roll ${expr}` : `/roll ${expr}`));
+    setTimeout(() => taRef.current?.focus(), 0);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -119,6 +154,8 @@ export function MessageInput({ chat }: Props) {
 
   const lastBot = [...messages].reverse().find((m) => m.role === "assistant");
   const canContinue = !streaming && !!lastBot && lastBot.content.trim().length > 0;
+  const isGm = chat.gameMode === "gm";
+  const [diceMenuOpen, setDiceMenuOpen] = useState(false);
 
   return (
     <div className="border-t border-app-border-soft bg-app-bg/50 backdrop-blur-md">
@@ -153,6 +190,39 @@ export function MessageInput({ chat }: Props) {
             className="w-full bg-transparent border-none outline-none resize-none py-1.5 pr-12 text-[14.5px] placeholder:text-app-text-muted"
           />
           <div className="absolute right-2 bottom-1.5 flex items-center gap-1">
+            {isGm && !streaming && (
+              <div className="relative">
+                <button
+                  onClick={() => setDiceMenuOpen((v) => !v)}
+                  className="p-2 text-app-text-muted hover:text-app-accent hover:bg-app-bg rounded-full transition-colors"
+                  title="Бросок кубика"
+                >
+                  <Dice5 size={16} />
+                </button>
+                {diceMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-30"
+                      onClick={() => setDiceMenuOpen(false)}
+                    />
+                    <div className="absolute right-0 bottom-full mb-2 z-40 bg-app-surface border border-app-border rounded-lg shadow-xl p-1 min-w-[140px]">
+                      {["1d20", "2d6", "1d100", "1d6"].map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => {
+                            setDiceMenuOpen(false);
+                            quickRoll(d);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-[13px] rounded hover:bg-app-accent/15 text-app-text font-mono"
+                        >
+                          /roll {d}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             {canContinue && !streaming && (
               <button
                 onClick={() =>

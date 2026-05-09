@@ -15,6 +15,12 @@ pub fn run() {
             sql: include_str!("../migrations/002_avatar_seed.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "add game mode, state and author note to chats",
+            sql: include_str!("../migrations/003_game_mode.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
