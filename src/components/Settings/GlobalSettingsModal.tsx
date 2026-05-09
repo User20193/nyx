@@ -5,6 +5,7 @@ import { useSettingsStore } from "../../stores/settingsStore";
 import { useModelStore } from "../../stores/modelStore";
 import { SystemPromptEditor } from "./SystemPromptEditor";
 import { ModelPicker } from "./ModelPicker";
+import { UNCENSORED_PRESETS } from "../../types";
 
 interface Props {
   onClose: () => void;
@@ -391,21 +392,91 @@ function PersonasTab() {
 
 function UncensoredTab() {
   const settings = useSettingsStore();
+
+  const activePresetId = (() => {
+    const cur = settings.global.uncensoredPrompt.trim();
+    const match = UNCENSORED_PRESETS.find((p) => p.prompt.trim() === cur);
+    return match?.id ?? "custom";
+  })();
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <ToggleRow
         label="Включить режим без цензуры"
-        description="Добавляет permissive system prompt в каждый чат"
+        description="Добавляет permissive system prompt в каждый чат и сценарий GM"
         value={settings.global.uncensoredEnabled}
         onChange={(v) => settings.updateGlobal({ uncensoredEnabled: v })}
       />
+
+      <div>
+        <label className="block text-[11px] uppercase tracking-wider text-app-text-dim mb-2 font-semibold">
+          Пресет
+        </label>
+        <div className="grid grid-cols-1 gap-1.5">
+          {UNCENSORED_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() =>
+                settings.updateGlobal({ uncensoredPrompt: p.prompt })
+              }
+              className={`text-left p-3 rounded-lg border transition-colors ${
+                activePresetId === p.id
+                  ? "border-app-accent bg-app-accent/10"
+                  : "border-app-border-soft bg-app-surface/40 hover:border-app-border"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium text-app-text">
+                  {p.name}
+                </div>
+                {activePresetId === p.id && (
+                  <Check size={13} className="text-app-accent" />
+                )}
+              </div>
+              <div className="text-[11.5px] text-app-text-muted mt-0.5 leading-snug">
+                {p.description}
+              </div>
+            </button>
+          ))}
+          {activePresetId === "custom" && (
+            <div className="text-[11px] text-app-accent px-1">
+              Активен свой текст промпта (ниже).
+            </div>
+          )}
+        </div>
+      </div>
+
       <SystemPromptEditor
         label="Текст промпта"
         value={settings.global.uncensoredPrompt}
         onChange={(v) => settings.updateGlobal({ uncensoredPrompt: v })}
       />
-      <div className="text-[11px] text-app-text-muted leading-relaxed bg-app-surface/60 border border-app-border rounded-md p-3">
-        Совет: лучше всего работает с моделями типа Mistral Nemo, файнтюнами Llama и DeepSeek. Некоторые модели всё равно фильтруют контент на стороне провайдера — пробуй разные.
+
+      <div className="text-[11px] text-app-text-muted leading-relaxed bg-app-surface/60 border border-app-border rounded-md p-3 space-y-1.5">
+        <div className="font-semibold text-app-text-dim">
+          Какие модели лучше слушаются:
+        </div>
+        <div>
+          • <span className="text-app-text">Mistral Nemo / Mixtral</span> —
+          практически без встроенной цензуры, отлично работает на Hard и
+          Dark fiction.
+        </div>
+        <div>
+          • <span className="text-app-text">DeepSeek-Chat / DeepSeek-V3</span>{" "}
+          — слабые фильтры, хорошо для длинных RP-сцен.
+        </div>
+        <div>
+          • <span className="text-app-text">Qwen2.5 / Qwen3</span> — почти
+          ничего не фильтруют.
+        </div>
+        <div>
+          • <span className="text-app-text">Llama 3.3 70B</span> —
+          частично фильтрует, обычно слушает только DAN-пресет.
+        </div>
+        <div className="pt-1.5 text-app-text-muted">
+          Если модель отказывает — переключи пресет на более жёсткий или
+          выбери другую модель в настройках чата.
+        </div>
       </div>
     </div>
   );
