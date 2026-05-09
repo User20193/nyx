@@ -18,6 +18,13 @@ export function ScenarioPicker({ onClose }: Props) {
   const [customWorld, setCustomWorld] = useState("");
   const [customName, setCustomName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [exiting, setExiting] = useState(false);
+
+  function close() {
+    if (exiting || creating) return;
+    setExiting(true);
+    setTimeout(onClose, 160);
+  }
 
   async function handleStart(s: Scenario) {
     setCreating(true);
@@ -48,19 +55,24 @@ export function ScenarioPicker({ onClose }: Props) {
     }
   }
 
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      animate={{ opacity: exiting ? 0 : 1 }}
       transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6"
-      onClick={onClose}
+      className={`fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6 ${
+        exiting ? "pointer-events-none" : ""
+      }`}
+      onClick={close}
     >
       <motion.div
         initial={{ scale: 0.96, y: 8 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.97, y: 6 }}
+        animate={{
+          scale: exiting ? 0.97 : 1,
+          y: exiting ? 6 : 0,
+          opacity: exiting ? 0 : 1,
+        }}
         transition={{ duration: 0.18 }}
         onClick={(e) => e.stopPropagation()}
         className="bg-app-bg border border-app-border rounded-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
@@ -85,7 +97,7 @@ export function ScenarioPicker({ onClose }: Props) {
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={close}
             className="p-1.5 hover:bg-app-surface rounded-md text-app-text-muted hover:text-app-text"
           >
             <X size={16} />

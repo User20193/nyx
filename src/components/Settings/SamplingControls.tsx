@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { SamplingSettings } from "../../types";
 import { defaultSampling } from "../../types";
@@ -137,12 +137,25 @@ interface SliderProps {
 }
 
 function Slider({ label, value, min, max, step, onChange, integer }: SliderProps) {
+  // Local draft updates as the user drags. We only commit upstream
+  // (which writes to DB) once the user releases the slider — otherwise
+  // a single drag fires hundreds of writes and stalls the UI.
+  const [draft, setDraft] = useState<number>(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  function commit() {
+    if (draft !== value) onChange(draft);
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between text-[11px] mb-1">
         <span className="text-app-text-dim">{label}</span>
         <span className="font-mono text-app-text">
-          {integer ? Math.round(value) : value.toFixed(2)}
+          {integer ? Math.round(draft) : draft.toFixed(2)}
         </span>
       </div>
       <input
@@ -150,8 +163,13 @@ function Slider({ label, value, min, max, step, onChange, integer }: SliderProps
         min={min}
         max={max}
         step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
+        value={draft}
+        onChange={(e) => setDraft(parseFloat(e.target.value))}
+        onMouseUp={commit}
+        onTouchEnd={commit}
+        onPointerUp={commit}
+        onKeyUp={commit}
+        onBlur={commit}
         className="w-full accent-[var(--color-app-accent)]"
       />
     </div>

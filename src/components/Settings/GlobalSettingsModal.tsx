@@ -17,20 +17,36 @@ export function GlobalSettingsModal({ onClose }: Props) {
   const settings = useSettingsStore();
   const models = useModelStore((s) => s.models);
   const [tab, setTab] = useState<Tab>("general");
+  const [exiting, setExiting] = useState(false);
+
+  // Centralised close: trip a brief "exiting" flag so the backdrop is
+  // pointer-events:none while the fade-out animation runs. Otherwise on
+  // some setups (Tauri WebView2 in particular) clicks during the exit
+  // window can land on the disappearing backdrop and feel like the UI
+  // has frozen.
+  function close() {
+    if (exiting) return;
+    setExiting(true);
+    setTimeout(onClose, 160);
+  }
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      animate={{ opacity: exiting ? 0 : 1 }}
       transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
-      onClick={onClose}
+      className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 ${
+        exiting ? "pointer-events-none" : ""
+      }`}
+      onClick={close}
     >
       <motion.div
         initial={{ scale: 0.95, y: 8 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.97, y: 6 }}
+        animate={{
+          scale: exiting ? 0.97 : 1,
+          y: exiting ? 6 : 0,
+          opacity: exiting ? 0 : 1,
+        }}
         transition={{ duration: 0.18 }}
         onClick={(e) => e.stopPropagation()}
         className="bg-app-bg border border-app-border rounded-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden flex flex-col"
@@ -38,7 +54,7 @@ export function GlobalSettingsModal({ onClose }: Props) {
         <div className="h-14 px-5 flex items-center justify-between border-b border-app-border">
           <div className="text-base font-semibold">Настройки</div>
           <button
-            onClick={onClose}
+            onClick={close}
             className="p-1.5 hover:bg-app-surface rounded-md text-app-text-muted hover:text-app-text"
           >
             <X size={16} />
@@ -100,29 +116,10 @@ export function GlobalSettingsModal({ onClose }: Props) {
                   value={settings.global.autoNameChats}
                   onChange={(v) => settings.updateGlobal({ autoNameChats: v })}
                 />
-                <div>
-                  <label className="block text-[11px] uppercase tracking-wider text-app-text-dim mb-2 font-semibold">
-                    Акцентный цвет
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={settings.global.accentColor}
-                      onChange={(e) =>
-                        settings.updateGlobal({ accentColor: e.target.value })
-                      }
-                      className="h-9 w-9 rounded cursor-pointer bg-transparent border border-app-border"
-                    />
-                    <input
-                      type="text"
-                      value={settings.global.accentColor}
-                      onChange={(e) =>
-                        settings.updateGlobal({ accentColor: e.target.value })
-                      }
-                      className="bg-app-surface border border-app-border rounded-md px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-app-accent"
-                    />
-                  </div>
-                </div>
+                <AccentColorPicker
+                  value={settings.global.accentColor}
+                  onChange={(v) => settings.updateGlobal({ accentColor: v })}
+                />
               </>
             )}
 
@@ -616,6 +613,57 @@ function KeysTab() {
           Добавить ключ
         </button>
       )}
+    </div>
+  );
+}
+
+// Local-buffered accent color picker. Native <input type="color"> emits
+// onChange continuously while the user drags inside the popover; if we
+// pipe every event into the store + DB it stalls the modal (and was the
+// trigger for the freeze users reported). We only commit upstream once
+// the user releases the picker (`onBlur`).
+function AccentColorPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  function commit(v: string) {
+    setDraft(v);
+    if (v !== value) onChange(v);
+  }
+
+  return (
+    <div>
+      <label className="block text-[11px] uppercase tracking-wider text-app-text-dim mb-2 font-semibold">
+        Акцентный цвет
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => commit(draft)}
+          className="h-9 w-9 rounded cursor-pointer bg-transparent border border-app-border"
+        />
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => commit(draft)}
+          className="bg-app-surface border border-app-border rounded-md px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-app-accent"
+        />
+        <button
+          type="button"
+          onClick={() => commit(draft)}
+          className="text-[11px] px-2 py-1 rounded-md border border-app-border-soft text-app-text-muted hover:text-app-text hover:border-app-border"
+        >
+          Применить
+        </button>
+      </div>
     </div>
   );
 }

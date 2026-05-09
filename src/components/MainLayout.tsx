@@ -109,14 +109,16 @@ export function MainLayout() {
           )}
         </AnimatePresence>
       </div>
-      <AnimatePresence>
-        {globalOpen && <GlobalSettingsModal onClose={() => setGlobalOpen(false)} />}
-      </AnimatePresence>
-      <AnimatePresence>
-        {scenarioPickerOpen && (
-          <ScenarioPicker onClose={() => setScenarioPickerOpen(false)} />
-        )}
-      </AnimatePresence>
+      {/*
+        Modals manage their own fade-out internally and unmount when fully
+        invisible. We deliberately don't wrap them in AnimatePresence so
+        there's no chance of an exiting backdrop intercepting clicks after
+        the user has dismissed it.
+      */}
+      {globalOpen && <GlobalSettingsModal onClose={() => setGlobalOpen(false)} />}
+      {scenarioPickerOpen && (
+        <ScenarioPicker onClose={() => setScenarioPickerOpen(false)} />
+      )}
     </div>
   );
 }
